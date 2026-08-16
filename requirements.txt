@@ -1,0 +1,18 @@
+opencv-python
+mediapipe
+numpy
+pandas
+scikit-learn
+websockets
+pyyaml
+
+# Phân tích dữ liệu & Biểu đồ (EDA)
+matplotlib
+seaborn
+
+# Tiền xử lý dữ liệu (Augmentation)
+albumentations
+tqdm
+
+# Huấn luyện mô hình
+ultralytics
