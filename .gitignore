@@ -1,0 +1,43 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# Môi trường ảo (Virtual Environment)
+.env
+.venv
+env/
+venv/
+ENV/
+
+# Node.js / Frontend
+node_modules/
+dist/
+build/
+.npm/
+
+# Bỏ qua dữ liệu gốc (Raw Data) chưa xử lý
+dataset/raw/
+# Các thư mục cũ không dùng nữa
+dataset/train/
+dataset/valid/
+
+# CHẶN đẩy dữ liệu (Cả Raw lẫn Processed) lên Git vì dung lượng quá lớn
+dataset/processed/
+# IDE / Trình soạn thảo
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Logs
+logs/
+*.log
+
+LearnNewThing.md
+
