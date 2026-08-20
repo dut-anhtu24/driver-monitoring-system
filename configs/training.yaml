@@ -1,0 +1,25 @@
+# Configuration for YOLO11 Training Pipeline
+
+model:
+  name: "yolo11n.pt"         # Options: yolo11n.pt, yolo11s.pt, yolo11m.pt
+  task: "detect"
+
+data:
+  yaml_path: "../../dataset/processed/data.yaml"
+
+train:
+  epochs: 50
+  imgsz: 416                 # Image size: 416 for edge optimization, 640 for high accuracy
+  batch_size: 16
+  workers: 4
+  patience: 15               # Early stopping patience
+  save_period: -1            # Save checkpoint every x epochs (-1 to disable)
+  exist_ok: true             # Overwrite existing experiment dir
+  project: "../../models"
+  name: "yolo11n_driver_face"
+
+optimizer:
+  lr0: 0.01
+  lrf: 0.01
+  momentum: 0.937
+  weight_decay: 0.0005
