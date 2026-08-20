@@ -1,0 +1,150 @@
+KẾ HOẠCH TRIỂN KHAI DỰ ÁN
+Hệ thống phát hiện buồn ngủ tài xế qua Facial Landmarks
+Nhóm 3 người · Thời gian: 5 ngày làm việc
+1. Mục tiêu Dự án
+Trong 5 ngày làm việc, nhóm xây dựng một hệ thống hoạt động end-to-end (working prototype) bao gồm: pipeline trích xuất facial landmark và tính các chỉ số nhận diện buồn ngủ (EAR/MAR/PERCLOS) chạy trực tiếp trên Raspberry Pi 4, kết nối real-time qua WebSocket đến Web Dashboard hiển thị trạng thái và phát cảnh báo âm thanh/hình ảnh tới tài xế.
+Mục tiêu ưu tiên hàng đầu của dự án là hoàn thành một hệ thống baseline (rule-based thresholding) ổn định, có khả năng demo trực tiếp trong điều kiện thực tế thay vì tập trung tối ưu các mô hình học sâu phức tạp.
+2. Phân tích & Lựa chọn Dataset
+Do thời gian triển khai ngắn (5 ngày), việc chọn dataset có khả năng truy cập nhanh và nhãn phù hợp đóng vai trò quyết định:
+Dataset
+Quy mô
+Định dạng / nhãn
+Khả thi (5 ngày)
+Ghi chú truy cập
+YawDD
+107 subjects (57 nam, 50 nữ), video
+4 lớp: bình thường, nói chuyện, ngáp, hát
+CAO
+Có mirror công khai trên Kaggle (vd. enider/yawdd-dataset), tải trực tiếp không cần xin phép — dùng được ngay Ngày 1
+UTA-RLDD
+60 subjects, ~30 giờ video RGB, 640×480
+3 lớp: alertness, low vigilance, drowsiness
+CAO
+Có mirror trên Kaggle (vd. minhngt02/uta-rldd), phù hợp validate vì quay trong tình huống thực tế hơn NTHU-DDD
+MRL Eye Dataset
+37 subjects, ~15.000 ảnh hồng ngoại vùng mắt
+2 lớp: mắt mở / mắt nhắm (ảnh tĩnh, không phải video)
+CAO
+Có sẵn trên Kaggle (vd. imadeddinedjerarda/mrl-eye-dataset), hữu ích để hiệu chỉnh ngưỡng EAR độc lập với điều kiện ánh sáng
+NTHU-DDD
+66.521 ảnh, 36 subjects, IR video
+5 lớp, có annotation frame-level & clip-level chi tiết nhất
+THẤP
+Phải gửi email kèm Dataset License Agreement đã ký tới NTHU CV Lab (cvlablai636@my.nthu.edu.tw); nhiều báo cáo cho thấy thời gian chờ duyệt kéo dài hàng tháng — không nên phụ thuộc vào dataset này cho sprint 5 ngày
+3. Phân công Vai trò & Trách nhiệm
+Thành viên
+Vai trò
+Nhiệm vụ chính
+Người A
+Data & Model Engineer
+Thu thập, xử lý dataset (NTHU-DDD, YawDD)
+Xây pipeline trích landmark (MediaPipe), tính EAR/MAR/PERCLOS
+Xây dựng bộ phân loại buồn ngủ (rule-based threshold)
+Người B
+Web & Backend Engineer
+Xây dựng backend FastAPI + WebSocket
+Xây dashboard hiển thị video, chỉ số EAR/MAR, cảnh báo real-time
+Kết nối dữ liệu từ thiết bị RPi lên web
+Người C
+Edge Deployment Engineer
+Cài đặt môi trường trên Raspberry Pi (OS, camera, thư viện)
+Tối ưu pipeline inference (headless, TFLite) để đạt FPS thực dụng
+Đóng gói, kiểm thử thiết bị thực tế, kết nối mạng đến server web
+4. Phương pháp & Công thức Thuật toán
+4.1. Eye Aspect Ratio (EAR) - Tỷ lệ mở mắt
+EAR được tính dựa trên 6 điểm landmark xung quanh mỗi mắt trích xuất từ MediaPipe Face Mesh. Công thức:
+EAR = (||p2 - p6|| + ||p3 - p5||) / (2 * ||p1 - p4||)
+Khi mắt mở bình thường: EAR dao động từ 0.28 đến 0.35.
+Khi mắt nhắm: EAR giảm xuống dưới ngưỡng (thường là 0.20 - 0.22).
+4.2. Mouth Aspect Ratio (MAR) - Tỷ lệ mở miệng (Ngáp)
+MAR đo khoảng cách mở của môi trên và môi dưới so với chiều rộng khuôn miệng để phát hiện hành vi ngáp:
+MAR = ||p_top - p_bottom|| / ||p_left - p_right||
+Ngưỡng ngáp: MAR > 0.50 kéo dài liên tục trong ít nhất 1.5 đến 2 giây (khoảng 30-40 frames).
+4.3. PERCLOS (Percentage of Eye Closure)
+PERCLOS là tiêu chuẩn vàng trong y khoa và an toàn giao thông để đo độ lơ đễnh/buồn ngủ. PERCLOS đại diện cho tỷ lệ thời gian mắt nhắm ít nhất 80% (tức EAR < Threshold) trong một cửa sổ thời gian N giây (ví dụ: 1 phút hoặc 300 frames):
+PERCLOS = (Số frames EAR < 0.20) / (Tổng số frames trong cửa sổ theo dõi) * 100%
+Cảnh báo mức 1 (Nhắc nhở): PERCLOS > 15%
+Cảnh báo mức 2 (Nguy hiểm - Còi báo động): PERCLOS > 25% hoặc nhắm mắt liên tục > 1.5 giây (khoảng 45 frames liên tiếp).
+5. Kiến trúc Hệ thống & Chuẩn dữ liệu WebSocket
+Luồng truyền dữ liệu End-to-End: RPi Camera -> MediaPipe Inference (Headless) -> Feature Extraction (EAR/MAR/PERCLOS) -> WebSocket Client (RPi) -> FastAPI Server (Backend) -> WebSocket Broadcast -> Web Dashboard (React/Chart.js).
+Dữ liệu JSON gửi từ RPi lên Server mỗi frame hoặc theo chu kỳ 100ms:
+{"timestamp": "2026-08-05T22:40:00Z", "driver_id": "rpi_01", "ear": 0.19, "mar": 0.22, "perclos": 0.28, "status": "DROWSY", "fps": 18}
+6. Lịch trình Triển khai 5 Ngày
+Ngày
+Người A (Data & Model)
+Người B (Web/Backend)
+Người C (Edge/RPi)
+1
+Tải & khám phá dataset (NTHU-DDD, YawDD)
+Viết script trích landmark bằng MediaPipe Face Mesh trên ảnh mẫu
+Xác định công thức EAR, MAR, PERCLOS
+Khởi tạo repo, dựng khung FastAPI
+Thiết kế schema dữ liệu WebSocket (EAR, MAR, trạng thái, timestamp)
+Dựng khung giao diện dashboard (layout tĩnh)
+Cài Raspberry Pi OS 64-bit, cập nhật hệ thống
+Cài Python, OpenCV, MediaPipe trên RPi
+Test camera (Pi Camera/USB) chụp & stream ảnh cơ bản
+2
+Hoàn thiện pipeline trích landmark cho toàn bộ dataset mẫu
+Tính EAR/MAR/PERCLOS theo thời gian, trực quan hoá biểu đồ
+Xác định ngưỡng (threshold) sơ bộ cho cảnh báo buồn ngủ
+Hoàn thiện API nhận dữ liệu real-time qua WebSocket
+Xây component hiển thị video feed + biểu đồ EAR/MAR live
+Thêm cảnh báo trực quan (đổi màu/âm thanh) khi vượt ngưỡng
+Chạy thử MediaPipe Face Landmarker real-time trên RPi, đo FPS
+Tối ưu chế độ headless (bỏ visualize) để tăng FPS
+Viết script gửi kết quả landmark/feature qua mạng (client WebSocket)
+3
+Cài đặt logic phân loại buồn ngủ (PERCLOS + N frame liên tiếp)
+Đánh giá độ chính xác trên tập validation nội bộ
+Bàn giao module feature-extraction cho Người C tích hợp vào RPi
+Hoàn thiện dashboard: lịch sử cảnh báo, trạng thái hiện tại
+Viết endpoint lưu log cảnh báo (theo thời gian)
+Kiểm thử backend với dữ liệu giả lập (mock data)
+Tích hợp module feature-extraction + logic cảnh báo từ Người A vào RPi
+Kết nối RPi với server backend của Người B (WebSocket client)
+Kiểm thử luồng dữ liệu RPi → Server ổn định
+4
+Tinh chỉnh ngưỡng cảnh báo dựa trên test thực tế từ RPi
+Hỗ trợ debug các trường hợp sai (ánh sáng, đeo kính, góc nghiêng)
+Chuẩn bị số liệu đánh giá (accuracy, false alarm rate) cho báo cáo
+Kết nối dashboard với dữ liệu thật từ RPi (end-to-end)
+Hoàn thiện UI/UX (responsive, rõ ràng cho demo)
+Kiểm thử độ trễ hiển thị (latency) và xử lý mất kết nối
+Kiểm thử toàn diện thiết bị: nhiều điều kiện ánh sáng, góc camera
+Đóng gói script chạy tự động khi khởi động RPi (systemd/cron)
+Ghi log hiệu năng: FPS, độ trễ, tài nguyên CPU/RAM
+5
+Cả nhóm: kiểm thử end-to-end toàn hệ thống (RPi → Server → Dashboard)
+Cả nhóm: sửa lỗi phát sinh, tối ưu hiệu năng lần cuối
+Cả nhóm: chuẩn bị kịch bản demo trực tiếp + viết tài liệu/báo cáo tổng kết
+7. Công cụ & Công nghệ Sử dụng
+Landmark extraction: MediaPipe Face Mesh / Face Landmarker (468/478 landmarks, TFLite Model)
+Feature engineering: EAR, MAR, PERCLOS, Head Pose (Pitch/Yaw/Roll)
+Phân loại: Rule-based threshold (Baseline 5 ngày); Mở rộng LSTM/1D-CNN cho pha tiếp theo
+Backend: Python FastAPI + Uvicorn + WebSocket Protocol
+Frontend: React / HTML5 + TailwindCSS + Chart.js (Biểu đồ EAR/MAR real-time)
+Thiết bị Edge: Raspberry Pi 4 Model B (4GB/8GB RAM, OS 64-bit) + Pi Camera V2 / USB Webcam HD
+Dataset tham chiếu: YawDD, UTA-RLDD, MRL Eye Dataset
+8. Rủi ro & Phương án Dự phòng
+Rủi ro
+Mức độ
+Phương án dự phòng
+FPS trên Raspberry Pi quá thấp
+Cao
+Chạy inference headless, giảm độ phân giải khung hình đầu vào, giảm tần suất xử lý (vd. 10-15 FPS thay vì 30 FPS) vẫn đủ cho bài toán buồn ngủ
+Kết nối mạng RPi-Server không ổn định
+Trung bình
+Thêm cơ chế reconnect tự động cho WebSocket client; test qua LAN cục bộ thay vì phụ thuộc Internet ngoài
+Không đủ thời gian train model temporal (LSTM)
+Trung bình
+Ưu tiên rule-based threshold (EAR/MAR/PERCLOS) làm baseline chạy được trong 5 ngày; LSTM để lại hướng phát triển tiếp theo
+Sai lệch điều kiện thực tế (ánh sáng, kính, góc camera)
+Trung bình
+Thu thêm vài đoạn clip test thực tế nhóm tự quay để hiệu chỉnh ngưỡng trước demo
+9. Kịch bản Kiểm thử & Tiêu chí Nghiệm thu
+Test Case 1 (Trạng thái Tỉnh táo): Người test ngồi trước camera, mắt mở, nói chuyện bình thường -> Hệ thống báo NORMAL, PERCLOS < 10%.
+Test Case 2 (Ngáp nhiều): Người test ngáp giả lập 2-3 lần -> Ngưỡng MAR > 0.5 kích hoạt cảnh báo YAWNING trên Dashboard.
+Test Case 3 (Nhắm mắt ngủ gật): Người test nhắm mắt kéo dài > 2 giây -> Ngưỡng EAR < 0.2 và PERCLOS tăng cao kích hoạt còi/đèn cảnh báo DROWSY khẩn cấp.
+Test Case 4 (Đeo kính & Ánh sáng yếu): Kiểm thử khả năng bắt landmark của MediaPipe khi đeo kính cận/kính râm nhạt và ánh sáng phòng tối.
+Bàn giao đầy đủ Source Code, Script khởi tạo RPi tự động và Tài liệu báo cáo hoàn chỉnh vào cuối Ngày 5.
