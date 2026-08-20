@@ -43,17 +43,17 @@ def validate():
         print("❌ Lỗi: Thư viện 'ultralytics' chưa được cài đặt.")
         return
 
-    print(f"\n🎯 BẮT ĐẦU ĐÁNH GIÁ MÔ HÌNH YOLOV11 NANO TRÊN TẬP TEST...")
+    print(f"\n🎯 BẮT ĐẦU ĐÁNH GIÁ MÔ HÌNH YOLOV11 NANO TRÊN TẬP VAL...")
     print(f"• Weights: {weights_path}")
     print(f"• Data YAML: {data_yaml}")
-    print(f"• Split: test\n")
+    print(f"• Split: val\n")
 
     model = YOLO(str(weights_path))
 
-    # Evaluate on test set
+    # Evaluate on val set
     metrics = model.val(
         data=data_yaml,
-        split="test",
+        split="val",
         batch=16,
         imgsz=416,
         device=device
