@@ -88,11 +88,23 @@ def main():
             elapsed = time.time() - start_time
             fps = frame_count / elapsed if elapsed > 0 else 0
 
-            # In thông số EAR/MAR thực tế lên màn hình Terminal
+            # 4. Hiển thị kết quả trực quan lên khung ảnh (GUI Window)
             ear_str = f"{ear:.3f}" if ear is not None else "N/A"
             mar_str = f"{mar:.3f}" if mar is not None else "N/A"
 
+            # Vẽ thông tin lên ảnh
+            cv2.putText(frame, f"FPS: {fps:.1f}", (20, 40), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 255, 0), 2)
+            cv2.putText(frame, f"STATUS: {status_info['status']}", (20, 80), cv2.FONT_HERSHEY_SIMPLEX, 0.9, status_info['color'], 2)
+            cv2.putText(frame, f"EAR: {ear_str} | MAR: {mar_str}", (20, 120), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2)
+
+            # In log ra Terminal
             print(f"\r[FRAME {frame_count:05d}] FPS: {fps:.1f} | Status: {status_info['status']:<20} | EAR: {ear_str} | MAR: {mar_str}", end="", flush=True)
+
+            # Hiển thị cửa sổ Video trực quan trên Remote Desktop
+            cv2.imshow("Driver Monitoring System - Edge AI", frame)
+            if cv2.waitKey(1) & 0xFF == ord('q'):
+                print("\n🛑 Người dùng đã bấm 'q' để thoát.")
+                break
 
             time.sleep(0.01)
 
@@ -105,5 +117,6 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
 
