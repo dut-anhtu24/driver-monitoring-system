@@ -51,6 +51,10 @@ def main():
     print(f"📷 Đang mở Camera (Index {camera_idx})...")
     cap = cv2.VideoCapture(camera_idx)
 
+    # Đặt độ phân giải nét cao HD (1280x720)
+    cap.set(cv2.CAP_PROP_FRAME_WIDTH, 1280)
+    cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 720)
+
     if not cap.isOpened():
         print(f"❌ Không thể mở Camera tại index {camera_idx}. Hãy kiểm tra lại kết nối camera!")
         return
