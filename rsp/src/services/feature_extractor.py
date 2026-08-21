@@ -3,8 +3,15 @@ import numpy as np
 
 try:
     import mediapipe as mp
+    try:
+        from mediapipe.python.solutions import face_mesh as mp_face_mesh
+    except ImportError:
+        try:
+            import mediapipe.solutions.face_mesh as mp_face_mesh
+        except ImportError:
+            mp_face_mesh = mp.solutions.face_mesh
     HAS_MEDIAPIPE = True
-except ImportError:
+except Exception:
     HAS_MEDIAPIPE = False
 
 class FacialFeatureExtractor:
@@ -20,13 +27,16 @@ class FacialFeatureExtractor:
     def __init__(self, max_num_faces=1, min_detection_confidence=0.5, min_tracking_confidence=0.5):
         self.has_mp = HAS_MEDIAPIPE
         if self.has_mp:
-            self.mp_face_mesh = mp.solutions.face_mesh
-            self.face_mesh = self.mp_face_mesh.FaceMesh(
-                max_num_faces=max_num_faces,
-                refine_landmarks=True,
-                min_detection_confidence=min_detection_confidence,
-                min_tracking_confidence=min_tracking_confidence
-            )
+            try:
+                self.face_mesh = mp_face_mesh.FaceMesh(
+                    max_num_faces=max_num_faces,
+                    refine_landmarks=True,
+                    min_detection_confidence=min_detection_confidence,
+                    min_tracking_confidence=min_tracking_confidence
+                )
+            except Exception as e:
+                print(f"⚠️ Lỗi khởi tạo MediaPipe FaceMesh: {e}")
+                self.has_mp = False
 
     @staticmethod
     def _euclidean_distance(point1, point2):
